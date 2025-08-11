@@ -1,5 +1,4 @@
 ; --- MODIFIED: Check if the custom icon exists before applying it ---
-; This prevents an error if logo.ico is not in the script's folder.
 if FileExist("logo.ico")
     Menu, Tray, Icon, logo.ico, , 1
 
@@ -25,14 +24,14 @@ global cooldownActive := false
 global firstDetectionTime := 0
 global purpleX := 0
 global purpleY := 0
+global selectedRes := ""
 
-; Main execution starts with resolution selection
+; Main execution now starts with resolution selection
 ShowResolutionSelection()
 return
 
-; Function to show resolution selection GUI
+; STEP 1: Resolution Selection GUI
 ShowResolutionSelection() {
-    ; Destroy other GUIs if they exist
     if WinExist("LostSectorsCounter")
         Gui, Main:Destroy
     if WinExist("Lost Sector Selection")
@@ -42,10 +41,10 @@ ShowResolutionSelection() {
         
     Gui, Res:New, +AlwaysOnTop -Caption +Border
     Gui, Res:+LastFound
-    OnMessage(0x201, "WM_LBUTTONDOWN") ; Make it draggable
+    OnMessage(0x201, "WM_LBUTTONDOWN")
     Gui, Res:Color, 212121
     Gui, Res:Font, cWhite s12, Arial
-    Gui, Res:Add, Text, x10 y10 w180 Center, Select your resolution:
+    Gui, Res:Add, Text, x10 y10 w180 Center, Step 1: Select Resolution
     Gui, Res:Font, s10
     Gui, Res:Add, Button, x25 y+20 w150 gSelect1440p, 1440p (2560x1440)
     Gui, Res:Add, Button, x25 y+10 w150 gSelect1080p, 1080p (1920x1080)
@@ -53,23 +52,62 @@ ShowResolutionSelection() {
     return
 }
 
-; Handlers for resolution selection buttons
 Select1440p:
-    global purpleX := 257
-    global purpleY := 189
+    global selectedRes := "1440p"
     Gui, Res:Destroy
-    ShowSectorSelection()
+    ShowHudSelection()
 return
 
 Select1080p:
-    ; Coordinates are scaled down from 1440p originals
-    global purpleX := 193 ; Scaled from 1440p: 257 * (1920/2560)
-    global purpleY := 142 ; Scaled from 1440p: 189 * (1080/1440)
+    global selectedRes := "1080p"
     Gui, Res:Destroy
+    ShowHudSelection()
+return
+
+; STEP 2: HUD Zoom Selection GUI
+ShowHudSelection() {
+    Gui, Hud:New, +AlwaysOnTop -Caption +Border
+    Gui, Hud:+LastFound
+    OnMessage(0x201, "WM_LBUTTONDOWN")
+    Gui, Hud:Color, 212121
+    Gui, Hud:Font, cWhite s12, Arial
+    Gui, Hud:Add, Text, x10 y10 w180 Center, Step 2: Select HUD Size
+    Gui, Hud:Font, s10
+    Gui, Hud:Add, Button, x25 y+20 w150 gSelectHudZoomedIn, Default (Zoomed In)
+    Gui, Hud:Add, Button, x25 y+10 w150 gSelectHudZoomedOut, Zoomed Out
+    Gui, Hud:Show, w200 h130, HUD Selection
+    return
+}
+
+; --- Handlers with Final Coordinates ---
+SelectHudZoomedIn:
+    global selectedRes, purpleX, purpleY
+    if (selectedRes = "1440p") {
+        purpleX := 257 ; Default 1440p coordinates
+        purpleY := 189
+    } else { ; 1080p
+        purpleX := 193 ; Default 1080p coordinates
+        purpleY := 142
+    }
+    Gui, Hud:Destroy
     ShowSectorSelection()
 return
 
-; This function now uses dynamic coordinates
+SelectHudZoomedOut:
+    global selectedRes, purpleX, purpleY
+    if (selectedRes = "1440p") {
+        ; --- MODIFIED: Using your provided 1440p coordinates ---
+        purpleX := 130
+        purpleY := 159
+    } else { ; 1080p
+        ; --- MODIFIED: Using calculated 1080p coordinates ---
+        purpleX := 97  ; Floor(130 * 0.75)
+        purpleY := 119 ; Floor(159 * 0.75)
+    }
+    Gui, Hud:Destroy
+    ShowSectorSelection()
+return
+
 purple_checker()
 {
     global purpleX, purpleY
@@ -83,13 +121,12 @@ purple_checker()
     return 0
 }
 
-; Sector selection GUI
+; STEP 3: Sector selection GUI
 ShowSectorSelection() {
     global
     
     if WinExist("LostSectorsCounter")
         Gui, Main:Destroy
-    
     if WinExist("Lost Sector Selection")
         Gui, Select:Destroy
     
@@ -98,7 +135,7 @@ ShowSectorSelection() {
     OnMessage(0x201, "WM_LBUTTONDOWN")
     Gui, Select:Color, 212121
     Gui, Select:Font, cWhite s10, Arial
-    Gui, Select:Add, Text, x10 y10, Select Lost Sector:
+    Gui, Select:Add, Text, x10 y10, Step 3: Select Lost Sector
     Gui, Select:Add, DropDownList, vSelectedSector x10 y+10 w180, K1 Logistics||Caldera|Creation|Skywatch|The Salt Mines|The Conflux
     Gui, Select:Add, Button, x10 y+20 w180 gSelectOK, OK
     
@@ -108,7 +145,7 @@ ShowSectorSelection() {
     Gui, Keybinds:Color, 212121
     Gui, Keybinds:Font, cWhite s10, Arial
     Gui, Keybinds:Add, Text, x10 y10 w200, Keybinds:
-    Gui, Keybinds:Add, Text, x10 y+5 w200, F1 - Change Resolution
+    Gui, Keybinds:Add, Text, x10 y+5 w200, F1 - Change Config (Res/HUD)
     Gui, Keybinds:Add, Text, x10 y+5 w200, F2 - Increment Counter
     Gui, Keybinds:Add, Text, x10 y+5 w200, F3 - Reset Counters
     Gui, Keybinds:Add, Text, x10 y+5 w200, F4 - Pause/Unpause Timer
@@ -143,7 +180,6 @@ SelectOK:
     CreateOverlay()
 return
 
-; Main overlay GUI
 CreateOverlay() {
     global
     
@@ -315,7 +351,6 @@ UpdateDisplay:
     }
 return
 
-; Helper function
 FormatTime(milliseconds) {
     seconds := Floor(milliseconds / 1000)
     minutes := Floor(seconds / 60)
@@ -323,7 +358,6 @@ FormatTime(milliseconds) {
     return minutes ":" (seconds < 10 ? "0" seconds : seconds)
 }
 
-; Universal function to make a GUI draggable
 WM_LBUTTONDOWN() {
     PostMessage, 0xA1, 2
 }
