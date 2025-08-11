@@ -1,3 +1,8 @@
+; --- NEW: Set the custom tray icon ---
+; This command loads 'logo.ico' from the script's folder.
+; Make sure the icon file is in the same directory as this script!
+Menu, Tray, Icon, logo.ico, , 1
+
 #NoEnv
 #SingleInstance, Force
 SetBatchLines, -1
@@ -18,15 +23,14 @@ global PrimeDrops := 0
 global firstDetectionDone := false
 global cooldownActive := false
 global firstDetectionTime := 0
-; --- MODIFIED: Added global variables for dynamic coordinates ---
 global purpleX := 0
 global purpleY := 0
 
-; --- MODIFIED: Main execution now starts with resolution selection ---
+; Main execution starts with resolution selection
 ShowResolutionSelection()
 return
 
-; --- NEW: Function to show resolution selection GUI ---
+; Function to show resolution selection GUI
 ShowResolutionSelection() {
     ; Destroy other GUIs if they exist
     if WinExist("LostSectorsCounter")
@@ -49,7 +53,7 @@ ShowResolutionSelection() {
     return
 }
 
-; --- NEW: Handlers for resolution selection buttons ---
+; Handlers for resolution selection buttons
 Select1440p:
     global purpleX := 257
     global purpleY := 189
@@ -65,17 +69,15 @@ Select1080p:
     ShowSectorSelection()
 return
 
-
-; --- MODIFIED: This function now uses dynamic coordinates ---
-; It checks for the solid purple color (0x605D7F) at the specified pixel coordinate.
+; This function now uses dynamic coordinates
 purple_checker()
 {
     global purpleX, purpleY
-    ; Searches for the color in a 1x1 pixel area at the coordinates set by the resolution selection.
     PixelSearch, Px, Py, purpleX, purpleY, purpleX, purpleY, 0x605D7F, 0, Fast RGB
 
-    if !ErrorLevel ; ErrorLevel is 0 if the color is found.
+    if !ErrorLevel
     {
+        SoundBeep
         return 1
     }
     return 0
@@ -85,14 +87,12 @@ purple_checker()
 ShowSectorSelection() {
     global
     
-    ; Destroy any existing GUI first
     if WinExist("LostSectorsCounter")
         Gui, Main:Destroy
     
     if WinExist("Lost Sector Selection")
         Gui, Select:Destroy
     
-    ; Create selection GUI
     Gui, Select:New, +AlwaysOnTop -Caption +Border
     Gui, Select:+LastFound
     OnMessage(0x201, "WM_LBUTTONDOWN")
@@ -102,7 +102,6 @@ ShowSectorSelection() {
     Gui, Select:Add, DropDownList, vSelectedSector x10 y+10 w180, K1 Logistics||Caldera|Creation|Skywatch|The Salt Mines|The Conflux
     Gui, Select:Add, Button, x10 y+20 w180 gSelectOK, OK
     
-    ; --- MODIFIED: Create keybinds window with new F1 hotkey and adjusted size ---
     Gui, Keybinds:New, +AlwaysOnTop -Caption +Border +OwnerSelect
     Gui, Keybinds:+LastFound
     OnMessage(0x201, "WM_LBUTTONDOWN")
@@ -117,7 +116,6 @@ ShowSectorSelection() {
     Gui, Keybinds:Add, Text, x10 y+5 w200, F6 - Increment Prime Drops
     Gui, Keybinds:Add, Text, x10 y+5 w200, Delete - Exit App
     
-    ; Show both GUIs
     Gui, Select:Show, w200 h120 xCenter y500, Lost Sector Selection
     Gui, Keybinds:Show, w220 h200 xCenter y650, Keybinds Reference
 }
@@ -127,12 +125,10 @@ SelectOK:
     Gui, Keybinds:Destroy
     SectorName := SelectedSector
     
-    ; Load fastest time and total clears from INI
     IniRead, FastestTime, LostSectors.ini, %SectorName%, FastestTime, 0
     FastestTime := FastestTime ? FastestTime : 0
     IniRead, TotalClears, LostSectors.ini, %SectorName%, TotalClears, 0
     
-    ; Reset counters and state variables for the new session
     LostSectorsCount := 0
     CurrentTime := 0
     TimerRunning := false
@@ -144,7 +140,6 @@ SelectOK:
     cooldownActive := false
     firstDetectionTime := 0
     
-    ; Create main overlay
     CreateOverlay()
 return
 
@@ -197,13 +192,11 @@ CreateOverlay() {
 }
 
 ; Hotkeys
-
-; --- NEW: Hotkey to return to resolution selection ---
 F1::
     ShowResolutionSelection()
 return
 
-F2:: ; Manually increment counter / complete run
+F2::
     if (!RunCompleted) {
         LostSectorsCount++
         TotalClears++
@@ -225,7 +218,7 @@ F2:: ; Manually increment counter / complete run
     }
 return
 
-F3:: ; Reset counters
+F3::
     LostSectorsCount := 0
     FastestTime := 0
     PrimeDrops := 0
@@ -243,11 +236,11 @@ F3:: ; Reset counters
     GuiControl, Main:+cWhite, CurrentTimeValue
 return
 
-Delete:: ; Exit app
+Delete::
     ExitApp
 return
 
-F4:: ; Pause/unpause timer
+F4::
     if (TimerRunning && !RunCompleted) {
         if (!Paused) {
             Paused := true
@@ -261,11 +254,11 @@ F4:: ; Pause/unpause timer
     }
 return
 
-F5:: ; Change sector
+F5::
     ShowSectorSelection()
 return
 
-F6:: ; Increment Prime Drops
+F6::
     PrimeDrops++
     GuiControl, Main:, PrimeDropsValue, %PrimeDrops%
 return
