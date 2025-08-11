@@ -1,7 +1,7 @@
-; --- NEW: Set the custom tray icon ---
-; This command loads 'logo.ico' from the script's folder.
-; Make sure the icon file is in the same directory as this script!
-Menu, Tray, Icon, logo.ico, , 1
+; --- MODIFIED: Check if the custom icon exists before applying it ---
+; This prevents an error if logo.ico is not in the script's folder.
+if FileExist("logo.ico")
+    Menu, Tray, Icon, logo.ico, , 1
 
 #NoEnv
 #SingleInstance, Force
