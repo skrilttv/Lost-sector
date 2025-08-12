@@ -2,72 +2,92 @@
 #SingleInstance, Force
 SetBatchLines, -1
 
-; --- CONFIGURATION: Automatically filled out for you ---
+; --- CONFIGURATION ---
 GitHub_User := "skrilttv"
 GitHub_Repo := "Lost-sector"
 
 ; --- SCRIPT VARIABLES ---
 LocalScriptFile := "LostSectorCounter.ahk"
 LocalVersionFile := "version.txt"
+LocalLogoFile := "Logo.ico"
+
 RemoteVersionURL := "https://raw.githubusercontent.com/" . GitHub_User . "/" . GitHub_Repo . "/main/version.txt"
 RemoteScriptURL := "https://raw.githubusercontent.com/" . GitHub_User . "/" . GitHub_Repo . "/main/LostSectorCounter.ahk"
+RemoteLogoURL := "https://raw.githubusercontent.com/" . GitHub_User . "/" . GitHub_Repo . "/main/Logo.ico"
 
-; --- CHECK FOR UPDATES ---
 
-; 1. Read the local version
-localVersion := "0" ; Default to 0 if no local version file exists
-if FileExist(LocalVersionFile)
-    FileRead, localVersion, %LocalVersionFile%
+; --- NEW, MORE ROBUST LOGIC ---
 
-; 2. Download and read the remote (GitHub) version
-TempRemoteVersionFile := A_Temp . "\lsc_remote_version.tmp"
-UrlDownloadToFile, %RemoteVersionURL%, %TempRemoteVersionFile%
-
-; Check if the download was successful
-if (ErrorLevel) {
-    MsgBox, 16, Update Check Failed, Could not download the version file from GitHub. Please check your internet connection.`n`nWill now attempt to start the local version.
+; 1. First-time run / Recovery check: Does the main script exist?
+if !FileExist(LocalScriptFile)
+{
+    MsgBox, 48, First-Time Setup, The main script file is missing.`n`nThe updater will now download all necessary files from GitHub.
+    DownloadAllFiles()
     RunLocalScript()
     ExitApp
 }
 
-FileRead, remoteVersion, %TempRemoteVersionFile%
-FileDelete, %TempRemoteVersionFile% ; Clean up the temporary file
-
-; 3. Compare versions
-if (remoteVersion > localVersion)
-{
-    ; New version found, prompt the user to update
-    MsgBox, 36, Update Available!, A new version (%remoteVersion%) is available. Your current version is %localVersion%.`n`nWould you like to download it now?
-    IfMsgBox, No
-    {
-        ; User declined update, run the existing local script
-        RunLocalScript()
-        ExitApp
-    }
-    
-    ; User agreed, download the new script and version file
-    SplashTextOn, 200, 50, Updating..., Downloading new version, please wait...
-    UrlDownloadToFile, %RemoteScriptURL%, %LocalScriptFile%
-    if (ErrorLevel) {
-        MsgBox, 16, Update Failed, Could not download the new script file. The program will not be updated.
-    } else {
-        UrlDownloadToFile, %RemoteVersionURL%, %LocalVersionFile% ; Update the local version file
-        MsgBox, 64, Update Complete, The script has been updated to version %remoteVersion%.
-    }
-    SplashTextOff
+; 2. If the script exists, proceed with the normal update check.
+; Read local version
+FileRead, localVersion, %LocalVersionFile%
+if (ErrorLevel) { ; Handle case where version file is missing but script exists
+    localVersion := "0"
 }
 
-; 4. Run the main script (either the old or the newly updated one)
+; Download and read remote version
+TempRemoteVersionFile := A_Temp . "\lsc_remote_version.tmp"
+UrlDownloadToFile, %RemoteVersionURL%, %TempRemoteVersionFile%
+if (ErrorLevel) {
+    MsgBox, 16, Update Check Failed, Could not connect to GitHub. Please check your internet connection.`n`nStarting the existing local version.
+    RunLocalScript()
+    ExitApp
+}
+FileRead, remoteVersion, %TempRemoteVersionFile%
+FileDelete, %TempRemoteVersionFile%
+
+; Compare versions
+if (remoteVersion > localVersion)
+{
+    MsgBox, 36, Update Available!, A new version (%remoteVersion%) is available. Your current version is %localVersion%.`n`nWould you like to download it now?
+    IfMsgBox, Yes
+    {
+        DownloadAllFiles()
+    }
+}
+
+; 3. Run the script
 RunLocalScript()
 ExitApp
 
+; --- FUNCTIONS ---
 
-; --- Function to run the main script ---
+DownloadAllFiles() {
+    global
+    SplashTextOn, 200, 50, Downloading..., Please wait...
+    
+    ; Download Script
+    UrlDownloadToFile, %RemoteScriptURL%, %LocalScriptFile%
+    if (ErrorLevel) {
+        SplashTextOff
+        MsgBox, 16, Error, Failed to download LostSectorCounter.ahk. Please check your internet connection and firewall settings.
+        ExitApp
+    }
+    
+    ; Download Version File
+    UrlDownloadToFile, %RemoteVersionURL%, %LocalVersionFile%
+    
+    ; Download Logo
+    UrlDownloadToFile, %RemoteLogoURL%, %LocalLogoFile%
+    
+    SplashTextOff
+    MsgBox, 64, Download Complete, All files have been downloaded successfully.
+}
+
 RunLocalScript() {
     global LocalScriptFile
     if FileExist(LocalScriptFile) {
         Run, %LocalScriptFile%
     } else {
-        MsgBox, 16, Error, Could not find the main script file (%LocalScriptFile%). The updater may need to run again to download it.
+        MsgBox, 16, Critical Error, Could not find or download the main script file. Please check your internet connection and firewall settings, then try running the updater again.
     }
 }
