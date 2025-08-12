@@ -16,9 +16,6 @@ global TimerRunning := false
 global SectorName := ""
 global RunCompleted := false
 global StartTime := 0
-global Paused := false
-global PauseStartTime := 0
-global TotalPausedTime := 0
 global PrimeDrops := 0
 global firstDetectionDone := false
 global cooldownActive := false
@@ -146,17 +143,17 @@ ShowSectorSelection() {
     OnMessage(0x201, "WM_LBUTTONDOWN")
     Gui, Keybinds:Color, 212121
     Gui, Keybinds:Font, cWhite s10, Arial
+    ; --- MODIFIED: Keybinds display updated ---
     Gui, Keybinds:Add, Text, x10 y10 w200, Keybinds:
-    Gui, Keybinds:Add, Text, x10 y+5 w200, F1 - Change Config (Res/HUD)
-    Gui, Keybinds:Add, Text, x10 y+5 w200, F2 - Increment Counter
-    Gui, Keybinds:Add, Text, x10 y+5 w200, F3 - Reset Counters
-    Gui, Keybinds:Add, Text, x10 y+5 w200, F4 - Pause/Unpause Timer
+    Gui, Keybinds:Add, Text, x10 y+5 w200, F2 - Change Config (Res/HUD)
+    Gui, Keybinds:Add, Text, x10 y+5 w200, F3 - Increment Counter
+    Gui, Keybinds:Add, Text, x10 y+5 w200, F4 - Abort/Reset Current Run
     Gui, Keybinds:Add, Text, x10 y+5 w200, F5 - Change Sector
     Gui, Keybinds:Add, Text, x10 y+5 w200, F6 - Increment Prime Drops
     Gui, Keybinds:Add, Text, x10 y+5 w200, Delete - Exit App
     
     Gui, Select:Show, w200 h120 xCenter y500, Lost Sector Selection
-    Gui, Keybinds:Show, w220 h200 xCenter y650, Keybinds Reference
+    Gui, Keybinds:Show, w220 h180 xCenter y650, Keybinds Reference ; Adjusted height
 }
 
 SelectOK:
@@ -173,8 +170,6 @@ SelectOK:
     PastTime := 0
     TimerRunning := false
     RunCompleted := false
-    Paused := false
-    TotalPausedTime := 0
     PrimeDrops := 0
     firstDetectionDone := false
     cooldownActive := false
@@ -236,12 +231,13 @@ CreateOverlay() {
     SetTimer, UpdateDisplay, 100
 }
 
-; Hotkeys
-F1::
+; --- MODIFIED: Hotkeys have been re-assigned ---
+
+F2:: ; Was F1
     ShowResolutionSelection()
 return
 
-F2::
+F3:: ; Was F2
     if (!RunCompleted) {
         LostSectorsCount++
         TotalClears++
@@ -249,7 +245,6 @@ F2::
         GuiControl, Main:, TotalClearsValue, %TotalClears%
         IniWrite, %TotalClears%, LostSectors.ini, %SectorName%, TotalClears
         
-        ; --- MODIFIED: Added 50 second check for Fastest Time ---
         if (TimerRunning && CurrentTime >= 50000 && (FastestTime == 0 || CurrentTime < FastestTime)) {
             FastestTime := CurrentTime
             IniWrite, %FastestTime%, LostSectors.ini, %SectorName%, FastestTime
@@ -263,49 +258,21 @@ F2::
         
         RunCompleted := true
         TimerRunning := false
-        Paused := false
         GuiControl, Main:, CurrentTimeValue, --:--
         GuiControl, Main:+cWhite, CurrentTimeValue
     }
 return
 
-F3::
-    LostSectorsCount := 0
-    FastestTime := 0
-    PrimeDrops := 0
-    PastTime := 0
-    IniWrite, 0, LostSectors.ini, %SectorName%, FastestTime
-    RunCompleted := false
-    Paused := false
-    TotalPausedTime := 0
+F4:: ; New "Abort Run" Function
+    ; This will stop the current timer and reset the script to wait for the next run.
+    ; It does NOT count as a clear and does NOT save the time.
+    TimerRunning := false
     firstDetectionDone := false
-    cooldownActive := false
-    firstDetectionTime := 0
     postRunCooldownActive := false
-    GuiControl, Main:, NumberPart, 0
-    GuiControl, Main:, FastestTimeValue, --:--
+    CurrentTime := 0
+    RunCompleted := false
     GuiControl, Main:, CurrentTimeValue, --:--
-    GuiControl, Main:, PastTimeValue, --:--
-    GuiControl, Main:, PrimeDropsValue, 0
     GuiControl, Main:+cWhite, CurrentTimeValue
-return
-
-Delete::
-    ExitApp
-return
-
-F4::
-    if (TimerRunning && !RunCompleted) {
-        if (!Paused) {
-            Paused := true
-            PauseStartTime := A_TickCount
-            GuiControl, Main:+cRed, CurrentTimeValue
-        } else {
-            Paused := false
-            TotalPausedTime += A_TickCount - PauseStartTime
-            GuiControl, Main:+cWhite, CurrentTimeValue
-        }
-    }
 return
 
 F5::
@@ -317,7 +284,11 @@ F6::
     GuiControl, Main:, PrimeDropsValue, %PrimeDrops%
 return
 
-; --- MODIFIED: TimerWatcher with post-run cooldown logic ---
+Delete::
+    ExitApp
+return
+
+; --- Timer functions ---
 TimerWatcher:
     if (postRunCooldownActive) {
         if (A_TickCount - postRunCooldownStartTime >= 10000) {
@@ -332,8 +303,6 @@ TimerWatcher:
         if (purple_checker()) {
             StartTime := A_TickCount
             TimerRunning := true
-            Paused := false
-            TotalPausedTime := 0
             firstDetectionDone := true
             cooldownActive := true
             firstDetectionTime := A_TickCount
@@ -353,7 +322,6 @@ TimerWatcher:
                 GuiControl, Main:, TotalClearsValue, %TotalClears%
                 IniWrite, %TotalClears%, LostSectors.ini, %SectorName%, TotalClears
                 
-                ; --- MODIFIED: Added 50 second check for Fastest Time ---
                 if (CurrentTime >= 50000 && (FastestTime == 0 || CurrentTime < FastestTime)) {
                     FastestTime := CurrentTime
                     IniWrite, %FastestTime%, LostSectors.ini, %SectorName%, FastestTime
@@ -374,12 +342,8 @@ TimerWatcher:
 return
 
 UpdateDisplay:
-    if (TimerRunning && !Paused && !RunCompleted) {
-        CurrentTime := (A_TickCount - StartTime) - TotalPausedTime
-        GuiControl, Main:, CurrentTimeValue, % FormatTime(CurrentTime)
-    }
-    else if (Paused) {
-        CurrentTime := (PauseStartTime - StartTime) - TotalPausedTime
+    if (TimerRunning && !RunCompleted) { ; Pause logic removed
+        CurrentTime := (A_TickCount - StartTime)
         GuiControl, Main:, CurrentTimeValue, % FormatTime(CurrentTime)
     }
 return
