@@ -2,9 +2,9 @@
 #SingleInstance, Force
 SetBatchLines, -1
 
-; --- CONFIGURATION: CHANGE THESE ---
-GitHub_User := "skrilttv" ; !!! EDIT THIS
-GitHub_Repo := "Lost-sector" ; !!! EDIT THIS
+; --- CONFIGURATION: Automatically filled out for you ---
+GitHub_User := "skrilttv"
+GitHub_Repo := "Lost-sector"
 
 ; --- SCRIPT VARIABLES ---
 LocalScriptFile := "LostSectorCounter.ahk"
@@ -68,6 +68,6 @@ RunLocalScript() {
     if FileExist(LocalScriptFile) {
         Run, %LocalScriptFile%
     } else {
-        MsgBox, 16, Error, Could not find the main script file (%LocalScriptFile%).
+        MsgBox, 16, Error, Could not find the main script file (%LocalScriptFile%). The updater may need to run again to download it.
     }
 }
