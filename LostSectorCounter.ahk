@@ -11,6 +11,7 @@ global LostSectorsCount := 0
 global TotalClears := 0
 global CurrentTime := 0
 global FastestTime := 0
+global PastTime := 0
 global TimerRunning := false
 global SectorName := ""
 global RunCompleted := false
@@ -22,6 +23,8 @@ global PrimeDrops := 0
 global firstDetectionDone := false
 global cooldownActive := false
 global firstDetectionTime := 0
+global postRunCooldownActive := false
+global postRunCooldownStartTime := 0
 global purpleX := 0
 global purpleY := 0
 global selectedRes := ""
@@ -90,21 +93,21 @@ SelectHudZoomedIn:
         purpleY := 142
     }
     Gui, Hud:Destroy
+    MsgBox, 262208, Brightness Requirement, NOTE: For the script to function correctly, please ensure your in-game brightness is set to 7.
     ShowSectorSelection()
 return
 
 SelectHudZoomedOut:
     global selectedRes, purpleX, purpleY
     if (selectedRes = "1440p") {
-        ; --- MODIFIED: Using your provided 1440p coordinates ---
         purpleX := 130
         purpleY := 159
     } else { ; 1080p
-        ; --- MODIFIED: Using calculated 1080p coordinates ---
         purpleX := 97  ; Floor(130 * 0.75)
         purpleY := 119 ; Floor(159 * 0.75)
     }
     Gui, Hud:Destroy
+    MsgBox, 262208, Brightness Requirement, NOTE: For the script to function correctly, please ensure your in-game brightness is set to 7.
     ShowSectorSelection()
 return
 
@@ -115,7 +118,6 @@ purple_checker()
 
     if !ErrorLevel
     {
-        SoundBeep
         return 1
     }
     return 0
@@ -168,6 +170,7 @@ SelectOK:
     
     LostSectorsCount := 0
     CurrentTime := 0
+    PastTime := 0
     TimerRunning := false
     RunCompleted := false
     Paused := false
@@ -176,6 +179,7 @@ SelectOK:
     firstDetectionDone := false
     cooldownActive := false
     firstDetectionTime := 0
+    postRunCooldownActive := false
     
     CreateOverlay()
 return
@@ -215,6 +219,11 @@ CreateOverlay() {
     Gui, Main:Font, cWhite s12 w700, Arial
     Gui, Main:Add, Text, vCurrentTimeValue x+2 yp w80 BackgroundTrans, --:--
     
+    Gui, Main:Font, cCCCCCC s12 w700, Arial
+    Gui, Main:Add, Text, vPastTimeLabel x20 y+5 BackgroundTrans, Past Time:
+    Gui, Main:Font, cWhite s12 w700, Arial
+    Gui, Main:Add, Text, vPastTimeValue x+2 yp w80 BackgroundTrans, --:--
+    
     Gui, Main:Font, cAA00FF s12 w700, Arial
     Gui, Main:Add, Text, vPrimeDropsLabel x20 y+5 BackgroundTrans, Prime Drops: 
     Gui, Main:Font, cWhite s12 w700, Arial
@@ -240,10 +249,16 @@ F2::
         GuiControl, Main:, TotalClearsValue, %TotalClears%
         IniWrite, %TotalClears%, LostSectors.ini, %SectorName%, TotalClears
         
-        if (TimerRunning && (FastestTime == 0 || CurrentTime < FastestTime)) {
+        ; --- MODIFIED: Added 50 second check for Fastest Time ---
+        if (TimerRunning && CurrentTime >= 50000 && (FastestTime == 0 || CurrentTime < FastestTime)) {
             FastestTime := CurrentTime
             IniWrite, %FastestTime%, LostSectors.ini, %SectorName%, FastestTime
             GuiControl, Main:, FastestTimeValue, % FormatTime(FastestTime)
+        }
+        
+        if (TimerRunning) {
+            PastTime := CurrentTime
+            GuiControl, Main:, PastTimeValue, % FormatTime(PastTime)
         }
         
         RunCompleted := true
@@ -258,6 +273,7 @@ F3::
     LostSectorsCount := 0
     FastestTime := 0
     PrimeDrops := 0
+    PastTime := 0
     IniWrite, 0, LostSectors.ini, %SectorName%, FastestTime
     RunCompleted := false
     Paused := false
@@ -265,9 +281,11 @@ F3::
     firstDetectionDone := false
     cooldownActive := false
     firstDetectionTime := 0
+    postRunCooldownActive := false
     GuiControl, Main:, NumberPart, 0
     GuiControl, Main:, FastestTimeValue, --:--
     GuiControl, Main:, CurrentTimeValue, --:--
+    GuiControl, Main:, PastTimeValue, --:--
     GuiControl, Main:, PrimeDropsValue, 0
     GuiControl, Main:+cWhite, CurrentTimeValue
 return
@@ -299,10 +317,16 @@ F6::
     GuiControl, Main:, PrimeDropsValue, %PrimeDrops%
 return
 
-; Timer functions
+; --- MODIFIED: TimerWatcher with post-run cooldown logic ---
 TimerWatcher:
-    if (RunCompleted)
+    if (postRunCooldownActive) {
+        if (A_TickCount - postRunCooldownStartTime >= 10000) {
+            postRunCooldownActive := false
+            firstDetectionDone := false
+            CurrentTime := 0
+        }
         return
+    }
 
     if (!firstDetectionDone) {
         if (purple_checker()) {
@@ -316,25 +340,34 @@ TimerWatcher:
         }
     }
     else { 
-        if (cooldownActive && (A_TickCount - firstDetectionTime >= 60000)) {
+        if (cooldownActive && (A_TickCount - firstDetectionTime >= 10000)) {
             cooldownActive := false
         }
 
         if (!cooldownActive) {
             if (purple_checker()) {
                 TimerRunning := false
-                RunCompleted := true
                 LostSectorsCount++
                 TotalClears++
                 GuiControl, Main:, NumberPart, %LostSectorsCount%
                 GuiControl, Main:, TotalClearsValue, %TotalClears%
                 IniWrite, %TotalClears%, LostSectors.ini, %SectorName%, TotalClears
                 
-                if (CurrentTime > 0 && (FastestTime == 0 || CurrentTime < FastestTime)) {
+                ; --- MODIFIED: Added 50 second check for Fastest Time ---
+                if (CurrentTime >= 50000 && (FastestTime == 0 || CurrentTime < FastestTime)) {
                     FastestTime := CurrentTime
                     IniWrite, %FastestTime%, LostSectors.ini, %SectorName%, FastestTime
                     GuiControl, Main:, FastestTimeValue, % FormatTime(FastestTime)
                 }
+                
+                PastTime := CurrentTime
+                GuiControl, Main:, PastTimeValue, % FormatTime(PastTime)
+                
+                GuiControl, Main:, CurrentTimeValue, --:--
+                GuiControl, Main:+cWhite, CurrentTimeValue
+
+                postRunCooldownActive := true
+                postRunCooldownStartTime := A_TickCount
             }
         }
     }
