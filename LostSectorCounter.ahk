@@ -358,4 +358,3 @@ FormatTime(milliseconds) {
 WM_LBUTTONDOWN() {
     PostMessage, 0xA1, 2
 }
-}
